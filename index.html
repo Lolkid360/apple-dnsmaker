@@ -115,7 +115,7 @@
                 </array>
                 ${dnsType === 'dnsOverHTTPS' ? `
                 <key>ServerURL</key>
-                <string>${dnsServer}</string>` : ''}
+                <string>${dnsServer.replace(/\/dns-query$/, '')}</string>` : ''}
             </dict>
         </dict>
     </array>
