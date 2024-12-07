@@ -49,6 +49,14 @@
         #errorMessage {
             color: red;
         }
+        #debugInfo {
+            margin-top: 20px;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: left;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
@@ -65,7 +73,7 @@
         <input 
             type="text" 
             id="dnsServer" 
-            placeholder="Enter DNS server (e.g., 1.1.1.1 or https://dns.example.com/dns-query)"
+            placeholder="Enter DNS server (e.g., 1.1.1.1 or cloudflare-dns.com)"
             value="1.1.1.1"
         >
         
@@ -75,47 +83,47 @@
             Tap "Install" when prompted by iOS to add the DNS profile.
         </div>
         <div id="errorMessage"></div>
+        <div id="debugInfo" style="display:none;"></div>
     </div>
 
     <script>
-        function validateDNSInput(dnsType, dnsServer) {
-            // For TLS, validate as an IP address
-            if (dnsType === 'dnsOverTLS') {
-                const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-                return ipv4Regex.test(dnsServer);
-            }
+        function validateAndPrepareDNSServer(dnsType, dnsServer) {
+            // Trim and clean input
+            dnsServer = dnsServer.trim().replace(/^https?:\/\//, '');
             
-            // For HTTPS, validate as a URL
-            try {
-                const url = new URL(dnsServer);
-                return url.protocol === 'https:';
-            } catch {
-                return false;
+            if (dnsType === 'dnsOverTLS') {
+                // For TLS, validate as an IP address
+                const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+                return ipv4Regex.test(dnsServer) ? dnsServer : null;
+            } else {
+                // For HTTPS, validate and prepare domain
+                // Remove any path or query parameters
+                const domainRegex = /^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$/;
+                return domainRegex.test(dnsServer) ? dnsServer : null;
             }
         }
 
         function generateProfile() {
             const dnsType = document.getElementById('dnsType').value;
-            const dnsServer = document.getElementById('dnsServer').value.trim();
+            const dnsServer = document.getElementById('dnsServer').value;
             const errorMessageEl = document.getElementById('errorMessage');
+            const debugInfoEl = document.getElementById('debugInfo');
 
-            // Clear previous error messages
+            // Clear previous messages
             errorMessageEl.textContent = '';
+            debugInfoEl.style.display = 'none';
 
-            // Validate input
-            if (!dnsServer) {
-                errorMessageEl.textContent = 'Please enter a DNS server address';
-                return;
-            }
-
-            if (!validateDNSInput(dnsType, dnsServer)) {
+            // Validate and prepare DNS server
+            const validatedServer = validateAndPrepareDNSServer(dnsType, dnsServer);
+            
+            if (!validatedServer) {
                 errorMessageEl.textContent = dnsType === 'dnsOverTLS' 
                     ? 'Please enter a valid IP address (e.g., 1.1.1.1)' 
-                    : 'Please enter a valid HTTPS URL (e.g., https://dns.example.com/dns-query)';
+                    : 'Please enter a valid domain (e.g., cloudflare-dns.com)';
                 return;
             }
 
-            // Optimized profile for iOS DNS configuration
+            // Prepare the profile content
             const profileContent = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -139,8 +147,11 @@
                 <string>${dnsType === 'dnsOverTLS' ? 'TLS' : 'HTTPS'}</string>
                 <key>ServerAddresses</key>
                 <array>
-                    <string>${dnsServer}</string>
+                    <string>${validatedServer}</string>
                 </array>
+                ${dnsType === 'dnsOverHTTPS' ? `
+                <key>ServerURL</key>
+                <string>https://${validatedServer}/dns-query</string>` : ''}
             </dict>
         </dict>
     </array>
@@ -160,6 +171,10 @@
     <integer>1</integer>
 </dict>
 </plist>`;
+
+            // Debug: Show profile content
+            debugInfoEl.textContent = profileContent;
+            debugInfoEl.style.display = 'block';
 
             // Create blob with exact MIME type
             const blob = new Blob([profileContent], { type: 'application/x-apple-aspen-config;charset=utf-8' });
