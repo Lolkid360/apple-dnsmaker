@@ -61,20 +61,12 @@
             <option value="dnsOverHTTPS">DNS over HTTPS</option>
         </select>
         
-        <label for="dnsServer">DNS Server:</label>
-        <select id="dnsProvider" style="margin-bottom: 15px;">
-            <option value="cloudflare">Cloudflare</option>
-            <option value="google">Google</option>
-            <option value="quad9">Quad9</option>
-            <option value="custom">Custom</option>
-        </select>
-
+        <label for="dnsServer">DNS Server Address:</label>
         <input 
             type="text" 
             id="dnsServer" 
-            placeholder="Enter DNS server (IP or domain)"
+            placeholder="Enter DNS server (IP or full HTTPS URL)"
             value="1.1.1.1"
-            style="display:none;"
         >
         
         <button id="installButton" onclick="generateProfile()">Install DNS Profile</button>
@@ -85,55 +77,9 @@
     </div>
 
     <script>
-        // DNS Providers Configuration
-        const dnsProviders = {
-            cloudflare: {
-                ip: '1.1.1.1',
-                tlsDomain: 'cloudflare-dns.com',
-                httpsDomain: 'cloudflare-dns.com',
-                dohPath: '/dns-query'
-            },
-            google: {
-                ip: '8.8.8.8',
-                tlsDomain: 'dns.google',
-                httpsDomain: 'dns.google',
-                dohPath: '/resolve'
-            },
-            quad9: {
-                ip: '9.9.9.9',
-                tlsDomain: 'dns.quad9.net',
-                httpsDomain: 'dns.quad9.net',
-                dohPath: '/dns-query'
-            }
-        };
-
-        // Update DNS server input based on provider selection
-        document.getElementById('dnsProvider').addEventListener('change', function() {
-            const dnsServerInput = document.getElementById('dnsServer');
-            const selectedProvider = this.value;
-
-            if (selectedProvider === 'custom') {
-                dnsServerInput.style.display = 'block';
-                dnsServerInput.value = '';
-            } else {
-                dnsServerInput.style.display = 'none';
-                const dnsType = document.getElementById('dnsType').value;
-                const provider = dnsProviders[selectedProvider];
-                dnsServerInput.value = dnsType === 'dnsOverTLS' ? provider.ip : provider.httpsDomain;
-            }
-        });
-
         function generateProfile() {
             const dnsType = document.getElementById('dnsType').value;
-            const dnsProvider = document.getElementById('dnsProvider').value;
-            const dnsServerInput = document.getElementById('dnsServer');
-            let dnsServer = dnsServerInput.value.trim();
-
-            // If not custom, use predefined server
-            if (dnsProvider !== 'custom') {
-                const provider = dnsProviders[dnsProvider];
-                dnsServer = dnsType === 'dnsOverTLS' ? provider.ip : provider.httpsDomain;
-            }
+            const dnsServer = document.getElementById('dnsServer').value.trim();
 
             // Validate input
             if (!dnsServer) {
@@ -169,7 +115,7 @@
                 </array>
                 ${dnsType === 'dnsOverHTTPS' ? `
                 <key>ServerURL</key>
-                <string>https://${dnsServer}/dns-query</string>` : ''}
+                <string>${dnsServer}</string>` : ''}
             </dict>
         </dict>
     </array>
