@@ -39,10 +39,15 @@
             cursor: pointer;
             margin-top: 20px;
         }
-        #instructions {
+        #instructions, #errorMessage {
             margin-top: 20px;
-            color: #666;
             font-size: 14px;
+        }
+        #instructions {
+            color: #666;
+        }
+        #errorMessage {
+            color: red;
         }
     </style>
 </head>
@@ -60,7 +65,7 @@
         <input 
             type="text" 
             id="dnsServer" 
-            placeholder="Enter DNS server (e.g., 1.1.1.1)"
+            placeholder="Enter DNS server (e.g., 1.1.1.1 or https://dns.example.com/dns-query)"
             value="1.1.1.1"
         >
         
@@ -69,15 +74,44 @@
         <div id="instructions">
             Tap "Install" when prompted by iOS to add the DNS profile.
         </div>
+        <div id="errorMessage"></div>
     </div>
 
     <script>
+        function validateDNSInput(dnsType, dnsServer) {
+            // For TLS, validate as an IP address
+            if (dnsType === 'dnsOverTLS') {
+                const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+                return ipv4Regex.test(dnsServer);
+            }
+            
+            // For HTTPS, validate as a URL
+            try {
+                const url = new URL(dnsServer);
+                return url.protocol === 'https:';
+            } catch {
+                return false;
+            }
+        }
+
         function generateProfile() {
             const dnsType = document.getElementById('dnsType').value;
-            const dnsServer = document.getElementById('dnsServer').value;
+            const dnsServer = document.getElementById('dnsServer').value.trim();
+            const errorMessageEl = document.getElementById('errorMessage');
 
+            // Clear previous error messages
+            errorMessageEl.textContent = '';
+
+            // Validate input
             if (!dnsServer) {
-                alert('Please enter a DNS server address');
+                errorMessageEl.textContent = 'Please enter a DNS server address';
+                return;
+            }
+
+            if (!validateDNSInput(dnsType, dnsServer)) {
+                errorMessageEl.textContent = dnsType === 'dnsOverTLS' 
+                    ? 'Please enter a valid IP address (e.g., 1.1.1.1)' 
+                    : 'Please enter a valid HTTPS URL (e.g., https://dns.example.com/dns-query)';
                 return;
             }
 
