@@ -49,14 +49,6 @@
         #errorMessage {
             color: red;
         }
-        #debugInfo {
-            margin-top: 20px;
-            background-color: #f0f0f0;
-            padding: 10px;
-            border-radius: 8px;
-            text-align: left;
-            word-break: break-all;
-        }
     </style>
 </head>
 <body>
@@ -69,12 +61,20 @@
             <option value="dnsOverHTTPS">DNS over HTTPS</option>
         </select>
         
-        <label for="dnsServer">DNS Server Address:</label>
+        <label for="dnsServer">DNS Server:</label>
+        <select id="dnsProvider" style="margin-bottom: 15px;">
+            <option value="cloudflare">Cloudflare</option>
+            <option value="google">Google</option>
+            <option value="quad9">Quad9</option>
+            <option value="custom">Custom</option>
+        </select>
+
         <input 
             type="text" 
             id="dnsServer" 
-            placeholder="Enter DNS server (e.g., 1.1.1.1 or cloudflare-dns.com)"
+            placeholder="Enter DNS server (IP or domain)"
             value="1.1.1.1"
+            style="display:none;"
         >
         
         <button id="installButton" onclick="generateProfile()">Install DNS Profile</button>
@@ -82,48 +82,66 @@
         <div id="instructions">
             Tap "Install" when prompted by iOS to add the DNS profile.
         </div>
-        <div id="errorMessage"></div>
-        <div id="debugInfo" style="display:none;"></div>
     </div>
 
     <script>
-        function validateAndPrepareDNSServer(dnsType, dnsServer) {
-            // Trim and clean input
-            dnsServer = dnsServer.trim().replace(/^https?:\/\//, '');
-            
-            if (dnsType === 'dnsOverTLS') {
-                // For TLS, validate as an IP address
-                const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-                return ipv4Regex.test(dnsServer) ? dnsServer : null;
-            } else {
-                // For HTTPS, validate and prepare domain
-                // Remove any path or query parameters
-                const domainRegex = /^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$/;
-                return domainRegex.test(dnsServer) ? dnsServer : null;
+        // DNS Providers Configuration
+        const dnsProviders = {
+            cloudflare: {
+                ip: '1.1.1.1',
+                tlsDomain: 'cloudflare-dns.com',
+                httpsDomain: 'cloudflare-dns.com',
+                dohPath: '/dns-query'
+            },
+            google: {
+                ip: '8.8.8.8',
+                tlsDomain: 'dns.google',
+                httpsDomain: 'dns.google',
+                dohPath: '/resolve'
+            },
+            quad9: {
+                ip: '9.9.9.9',
+                tlsDomain: 'dns.quad9.net',
+                httpsDomain: 'dns.quad9.net',
+                dohPath: '/dns-query'
             }
-        }
+        };
+
+        // Update DNS server input based on provider selection
+        document.getElementById('dnsProvider').addEventListener('change', function() {
+            const dnsServerInput = document.getElementById('dnsServer');
+            const selectedProvider = this.value;
+
+            if (selectedProvider === 'custom') {
+                dnsServerInput.style.display = 'block';
+                dnsServerInput.value = '';
+            } else {
+                dnsServerInput.style.display = 'none';
+                const dnsType = document.getElementById('dnsType').value;
+                const provider = dnsProviders[selectedProvider];
+                dnsServerInput.value = dnsType === 'dnsOverTLS' ? provider.ip : provider.httpsDomain;
+            }
+        });
 
         function generateProfile() {
             const dnsType = document.getElementById('dnsType').value;
-            const dnsServer = document.getElementById('dnsServer').value;
-            const errorMessageEl = document.getElementById('errorMessage');
-            const debugInfoEl = document.getElementById('debugInfo');
+            const dnsProvider = document.getElementById('dnsProvider').value;
+            const dnsServerInput = document.getElementById('dnsServer');
+            let dnsServer = dnsServerInput.value.trim();
 
-            // Clear previous messages
-            errorMessageEl.textContent = '';
-            debugInfoEl.style.display = 'none';
+            // If not custom, use predefined server
+            if (dnsProvider !== 'custom') {
+                const provider = dnsProviders[dnsProvider];
+                dnsServer = dnsType === 'dnsOverTLS' ? provider.ip : provider.httpsDomain;
+            }
 
-            // Validate and prepare DNS server
-            const validatedServer = validateAndPrepareDNSServer(dnsType, dnsServer);
-            
-            if (!validatedServer) {
-                errorMessageEl.textContent = dnsType === 'dnsOverTLS' 
-                    ? 'Please enter a valid IP address (e.g., 1.1.1.1)' 
-                    : 'Please enter a valid domain (e.g., cloudflare-dns.com)';
+            // Validate input
+            if (!dnsServer) {
+                alert('Please enter a DNS server');
                 return;
             }
 
-            // Prepare the profile content
+            // Prepare profile content
             const profileContent = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -147,11 +165,11 @@
                 <string>${dnsType === 'dnsOverTLS' ? 'TLS' : 'HTTPS'}</string>
                 <key>ServerAddresses</key>
                 <array>
-                    <string>${validatedServer}</string>
+                    <string>${dnsServer}</string>
                 </array>
                 ${dnsType === 'dnsOverHTTPS' ? `
                 <key>ServerURL</key>
-                <string>https://${validatedServer}/dns-query</string>` : ''}
+                <string>https://${dnsServer}/dns-query</string>` : ''}
             </dict>
         </dict>
     </array>
@@ -171,10 +189,6 @@
     <integer>1</integer>
 </dict>
 </plist>`;
-
-            // Debug: Show profile content
-            debugInfoEl.textContent = profileContent;
-            debugInfoEl.style.display = 'block';
 
             // Create blob with exact MIME type
             const blob = new Blob([profileContent], { type: 'application/x-apple-aspen-config;charset=utf-8' });
