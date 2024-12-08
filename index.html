@@ -74,17 +74,44 @@
         <div id="instructions">
             Tap "Install" when prompted by iOS to add the DNS profile.
         </div>
+        <div id="errorMessage"></div>
     </div>
 
     <script>
+        // Enhanced UUID generation using crypto API
+        function generateUUID() {
+            return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+            );
+        }
+
         function generateProfile() {
             const dnsType = document.getElementById('dnsType').value;
             const dnsServer = document.getElementById('dnsServer').value.trim();
+            const errorMessageEl = document.getElementById('errorMessage');
+            errorMessageEl.textContent = ''; // Clear previous errors
 
-            // Validate input
+            // Comprehensive input validation
             if (!dnsServer) {
-                alert('Please enter a DNS server');
+                errorMessageEl.textContent = 'Please enter a DNS server address';
                 return;
+            }
+
+            // Validation for DNS over TLS
+            if (dnsType === 'dnsOverTLS') {
+                const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+                if (!ipRegex.test(dnsServer)) {
+                    errorMessageEl.textContent = 'For DNS over TLS, please enter a valid IP address (e.g., 1.1.1.1)';
+                    return;
+                }
+            } 
+            // Validation for DNS over HTTPS
+            else if (dnsType === 'dnsOverHTTPS') {
+                const httpsRegex = /^https:\/\/.+\/.*dns-?query.*/i;
+                if (!httpsRegex.test(dnsServer)) {
+                    errorMessageEl.textContent = 'For DNS over HTTPS, please enter a valid HTTPS DNS query URL';
+                    return;
+                }
             }
 
             // Prepare profile content
@@ -147,14 +174,6 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-        }
-
-        function generateUUID() {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                var r = Math.random() * 16 | 0, 
-                    v = c == 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
         }
 
         // Detect if not on iOS Safari
